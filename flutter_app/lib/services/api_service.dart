@@ -58,6 +58,17 @@ class ApiService {
     return Group.fromJson(jsonDecode(response.body));
   }
 
+  Future<Group> getGroup(String groupId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/groups/$groupId'),
+      headers: await _headers,
+    );
+    if (response.statusCode == 200) {
+      return Group.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Failed to get group info');
+  }
+
   Future<List<User>> getGroupMembers(String groupId) async {
     final response = await http.get(
       Uri.parse('$baseUrl/groups/$groupId/members'),

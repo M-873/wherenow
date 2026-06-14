@@ -24,7 +24,7 @@ class Location {
   factory Location.fromJson(Map<String, dynamic> json) {
     return Location(
       id: json['_id'],
-      userId: json['userId'],
+      userId: json['userId'] is Map ? json['userId']['_id'] : json['userId'],
       groupId: json['groupId'],
       latitude: json['latitude'].toDouble(),
       longitude: json['longitude'].toDouble(),

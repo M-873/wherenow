@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:location/location.dart' as loc;
 import '../providers/auth_provider.dart';
 import 'join_group_screen.dart';
 
@@ -28,6 +30,7 @@ class _ChildModeScreenState extends State<ChildModeScreen> with SingleTickerProv
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     _checkPermissions();
+    _checkServiceStatus();
   }
 
   @override
@@ -36,11 +39,22 @@ class _ChildModeScreenState extends State<ChildModeScreen> with SingleTickerProv
     super.dispose();
   }
 
+  Future<void> _checkServiceStatus() async {
+    final isRunning = await FlutterBackgroundService().isRunning();
+    setState(() {
+      _safeModeActive = isRunning;
+      if (_safeModeActive) {
+        _pulseController.repeat(reverse: true);
+      }
+    });
+  }
+
   Future<void> _checkPermissions() async {
     final locStatus = await Permission.locationAlways.status;
     final notifStatus = await Permission.notification.status;
+    final batteryStatus = await Permission.ignoreBatteryOptimizations.status;
     setState(() {
-      _permissionsGranted = locStatus.isGranted && notifStatus.isGranted;
+      _permissionsGranted = locStatus.isGranted && notifStatus.isGranted && batteryStatus.isGranted;
     });
   }
 
@@ -48,30 +62,37 @@ class _ChildModeScreenState extends State<ChildModeScreen> with SingleTickerProv
     final statuses = await [
       Permission.locationAlways,
       Permission.notification,
+      Permission.ignoreBatteryOptimizations,
     ].request();
 
     setState(() {
       _permissionsGranted = statuses[Permission.locationAlways]!.isGranted &&
-          statuses[Permission.notification]!.isGranted;
+          statuses[Permission.notification]!.isGranted &&
+          statuses[Permission.ignoreBatteryOptimizations]!.isGranted;
     });
   }
 
-  void _toggleSafeMode() {
+  Future<void> _toggleSafeMode() async {
     if (!_permissionsGranted) {
-      _requestPermissions();
+      await _requestPermissions();
       return;
     }
-    setState(() {
-      _safeModeActive = !_safeModeActive;
-      if (_safeModeActive) {
-        _pulseController.repeat(reverse: true);
-        // Start background service here
-      } else {
+    
+    final isRunning = await FlutterBackgroundService().isRunning();
+    if (isRunning) {
+      FlutterBackgroundService().invoke("stopService");
+      setState(() {
+        _safeModeActive = false;
         _pulseController.stop();
         _pulseController.reset();
-        // Stop background service here
-      }
-    });
+      });
+    } else {
+      await FlutterBackgroundService().startService();
+      setState(() {
+        _safeModeActive = true;
+        _pulseController.repeat(reverse: true);
+      });
+    }
   }
 
   @override
@@ -236,24 +257,37 @@ class _ChildModeScreenState extends State<ChildModeScreen> with SingleTickerProv
 
   Future<void> _sendSOS() async {
     try {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.warning, color: Colors.white),
-              SizedBox(width: 12),
-              Text('SOS Alert Sent to Host!', style: TextStyle(fontWeight: FontWeight.bold)),
-            ],
+      final location = loc.Location();
+      final locationData = await location.getLocation();
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      
+      await auth.apiService!.sendSOS(
+        locationData.latitude!,
+        locationData.longitude!,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.warning, color: Colors.white),
+                SizedBox(width: 12),
+                Text('SOS Alert Sent to Host!', style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send SOS: $e')),
+        );
+      }
     }
   }
 }

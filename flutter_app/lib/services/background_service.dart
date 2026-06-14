@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:location/location.dart' as loc;
+import 'package:firebase_core/firebase_core.dart';
+import 'package:battery_plus/battery_plus.dart';
 import 'offline_storage.dart';
 import 'api_service.dart';
 
@@ -49,6 +51,12 @@ Future<bool> onIosBackground(ServiceInstance service) async {
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
+  
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    print('Failed to initialize Firebase inside background service: $e');
+  }
 
   final location = loc.Location();
   final apiService = ApiService();
@@ -64,19 +72,27 @@ void onStart(ServiceInstance service) async {
         try {
           final locationData = await location.getLocation();
           
+          double? batteryLevel;
+          try {
+            final level = await Battery().batteryLevel;
+            batteryLevel = level.toDouble();
+          } catch (e) {
+            print('Could not get battery level: $e');
+          }
+
           // Try to sync directly if online
           try {
             await apiService.sendLocation(
               locationData.latitude!,
               locationData.longitude!,
               locationData.accuracy,
-              null // Battery level could be added using battery_plus package
+              batteryLevel,
             );
 
             // If we successfully sent current location, check if there are offline locations to sync
             final pending = await OfflineStorage.getPendingLocations();
             if (pending.isNotEmpty) {
-              await apiService.syncOfflineLocations(pending, null);
+              await apiService.syncOfflineLocations(pending, batteryLevel);
               await OfflineStorage.clearPendingLocations();
             }
           } catch (e) {

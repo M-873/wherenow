@@ -41,6 +41,10 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  Future<void> getCurrentUser() async {
+    await _syncUser();
+  }
+
   Future<bool> register(String name, String email, String password, String role) async {
     try {
       await fb_auth.FirebaseAuth.instance.createUserWithEmailAndPassword(

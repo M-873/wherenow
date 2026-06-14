@@ -108,7 +108,7 @@ class MapScreen extends StatelessWidget {
                     ),
                   MarkerLayer(
                     markers: locationProvider.locations.map((loc) {
-                      final isSelected = locationProvider.selectedUserIdForHistory == loc.userId.id;
+                      final isSelected = locationProvider.selectedUserIdForHistory == loc.userId;
                       return Marker(
                         point: LatLng(loc.latitude, loc.longitude),
                         width: 60,
@@ -118,7 +118,7 @@ class MapScreen extends StatelessWidget {
                             if (isSelected) {
                               locationProvider.clearHistory();
                             } else {
-                              locationProvider.loadUserHistory(loc.userId.id);
+                              locationProvider.loadUserHistory(loc.userId);
                             }
                           },
                           child: Column(

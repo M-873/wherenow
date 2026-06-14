@@ -51,6 +51,23 @@ router.post('/join', auth, async (req, res) => {
   }
 });
 
+router.get('/:groupId', auth, async (req, res) => {
+  try {
+    const group = await Group.findById(req.params.groupId);
+    if (!group) {
+      return res.status(404).json({ message: 'Group not found' });
+    }
+
+    if (!group.members.includes(req.user._id.toString())) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    res.json(group);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 router.get('/:groupId/members', auth, async (req, res) => {
   try {
     const group = await Group.findById(req.params.groupId).populate('members', '-password');

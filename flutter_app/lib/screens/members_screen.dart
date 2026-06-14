@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/user.dart';
+import '../models/group.dart';
 
 class MembersScreen extends StatefulWidget {
   const MembersScreen({super.key});
@@ -123,10 +124,46 @@ class _MembersScreenState extends State<MembersScreen> {
         title: const Text('Invite Code'),
         content: Consumer<AuthProvider>(
           builder: (context, auth, child) {
-            return FutureBuilder(
-              future: auth.apiService?.getGroupMembers(auth.user!.groupId!),
+            return FutureBuilder<Group>(
+              future: auth.apiService?.getGroup(auth.user!.groupId!),
               builder: (context, snapshot) {
-                return const Text('Share this code with members to join');
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const SizedBox(
+                    height: 100,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (snapshot.hasError || !snapshot.hasData) {
+                  return Text('Error fetching invite code: ${snapshot.error}');
+                }
+                final group = snapshot.data!;
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Share this code with family members so they can join your space.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: SelectableText(
+                        group.inviteCode,
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade900,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
               },
             );
           },
